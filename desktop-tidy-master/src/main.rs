@@ -215,19 +215,13 @@ impl Component for MainModel {
                 self.button.hide()?;
                 self.progress.hide()?;
 
-                let origin = self.window.loc()?;
-                let size = self.window.size()?;
-                let rect = Rect::new(origin, size);
-                arrange_icons(&self.desktop_view, rect)?;
+                arrange_icons(&self.desktop_view, &self.window)?;
 
                 Ok(true)
             }
             MainMessage::MoveIcon => {
                 if self.completed {
-                    let origin = self.window.loc()?;
-                    let size = self.window.size()?;
-                    let rect = Rect::new(origin, size);
-                    arrange_icons(&self.desktop_view, rect)?;
+                    arrange_icons(&self.desktop_view, &self.window)?;
                 }
                 Ok(false)
             }
@@ -263,13 +257,17 @@ fn spawn_timer(sender: ComponentSender<MainModel>) {
     .detach();
 }
 
-fn arrange_icons(desktop_view: &DesktopView, rect: Rect) -> std::result::Result<(), Error> {
-    let icons = desktop_view.icons()?;
+fn arrange_icons(desktop_view: &DesktopView, window: &Window) -> std::result::Result<(), Error> {
+    let origin = window.loc()?;
+    let size = window.size()?;
+    let rect = Rect::new(origin, size);
 
     let left = rect.min_x() as i32;
     let top = rect.min_y() as i32;
     let right = rect.max_x() as i32 - 80;
     let bottom = rect.max_y() as i32 - 80;
+
+    let icons = desktop_view.icons()?;
 
     for icon in icons {
         if let Some(x) = fastrand::choice(left..right)
