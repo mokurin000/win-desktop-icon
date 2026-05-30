@@ -1,0 +1,11 @@
+[package]
+name = "backup-desktop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eyre = { workspace = true }
+spdlog-rs = { workspace = true }
+desktop-icon = { workspace = true }
+
+argh = { version = "0.1.19", default-features = false, features = ["help"] }

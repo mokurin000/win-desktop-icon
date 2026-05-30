@@ -3,16 +3,16 @@ use std::ptr::NonNull;
 use crate::com::ComApartment;
 use crate::error::{AppError, Result};
 
-use windows::core::{Interface, PWSTR};
 use windows::Win32::Foundation::POINT;
-use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, IServiceProvider, CLSCTX_ALL};
-use windows::Win32::System::Variant::{VariantInit, VARIANT};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, IServiceProvider};
+use windows::Win32::System::Variant::{VARIANT, VariantInit};
 use windows::Win32::UI::Shell::Common::{ITEMIDLIST, STRRET};
 use windows::Win32::UI::Shell::{
-    IEnumIDList, IFolderView, IShellBrowser, IShellFolder, IShellView, IShellWindows,
-    SID_STopLevelBrowser, ShellWindows, SHGDN_NORMAL, SVGIO_ALLVIEW, SVSI_POSITIONITEM,
-    SWC_DESKTOP, SWFO_NEEDDISPATCH,
+    IEnumIDList, IFolderView, IShellBrowser, IShellFolder, IShellView, IShellWindows, SHGDN_NORMAL,
+    SID_STopLevelBrowser, SVGIO_ALLVIEW, SVSI_POSITIONITEM, SWC_DESKTOP, SWFO_NEEDDISPATCH,
+    ShellWindows,
 };
+use windows::core::{Interface, PWSTR};
 
 mod icon;
 use icon::DesktopIcon;
@@ -75,10 +75,12 @@ impl DesktopView {
     ///
     /// bytes must be exactly the same as `DesktopIcon::as_bytes` from the same Windows instance.
     pub unsafe fn icon_from_bytes<'a, 'b>(&'a self, bytes: &'b mut [u8]) -> DesktopIcon<'a, 'b> {
-        DesktopIcon::from_rust(
-            // SAFETY: & is never null pointer
-            NonNull::new_unchecked(bytes as *mut [u8] as *mut u8 as _),
-        )
+        unsafe {
+            DesktopIcon::from_rust(
+                // SAFETY: & is never null pointer
+                NonNull::new_unchecked(bytes as *mut [u8] as *mut u8 as _),
+            )
+        }
     }
 
     pub fn icon_set_position(&self, icon: &DesktopIcon, point: &POINT) -> Result<()> {

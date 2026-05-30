@@ -1,8 +1,8 @@
 use argh::FromArgs;
 use spdlog::error;
 
-use win_desktop_icon::desktop::DesktopView;
-use win_desktop_icon::utils::{backup_icons, restore_icons};
+use desktop_icon::desktop::DesktopView;
+use desktop_icon::utils::{backup_icons, restore_icons};
 
 #[derive(FromArgs)]
 /// Backup or restore desktop icon positions.
