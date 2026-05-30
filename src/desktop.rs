@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use crate::com::ComApartment;
 use crate::error::{AppError, Result};
 use windows::core::{Interface, PWSTR};
@@ -10,11 +12,19 @@ use windows::Win32::UI::Shell::{
     SWFO_NEEDDISPATCH,
 };
 
+/// This will free memory of ITEMIDLIST on drop.
 #[derive(Debug, Clone)]
 pub struct DesktopIcon {
     pub x: i32,
     pub y: i32,
     pub name: String,
+    pub idlist: NonNull<ITEMIDLIST>,
+}
+
+impl Drop for DesktopIcon {
+    fn drop(&mut self) {
+        unsafe { CoTaskMemFree(Some(self.idlist.as_ptr() as _)) };
+    }
 }
 
 pub fn list_desktop_icons() -> Result<Vec<DesktopIcon>> {
@@ -25,7 +35,7 @@ pub fn list_desktop_icons() -> Result<Vec<DesktopIcon>> {
 
     let mut icons = Vec::new();
     while let Some(idlist) = next_item(&enumerator)? {
-        if let Ok(icon) = read_icon(&view, &folder, &idlist) {
+        if let Ok(icon) = read_icon(&view, &folder, idlist) {
             icons.push(icon);
         }
     }
@@ -61,46 +71,42 @@ fn find_desktop_folder_view() -> Result<IFolderView> {
     Ok(folder_view)
 }
 
-fn next_item(enumerator: &IEnumIDList) -> Result<Option<ITEMIDLIST>> {
-    let mut idlist = ITEMIDLIST::default();
-    let mut fetched = 0;
+fn next_item(enumerator: &IEnumIDList) -> Result<Option<NonNull<ITEMIDLIST>>> {
+    let mut pidls = [std::ptr::null_mut::<ITEMIDLIST>(); 1];
 
     unsafe {
-        enumerator
-            .Next(&mut [&mut idlist], Some(&mut fetched))
-            .ok()?;
+        enumerator.Next(&mut pidls, None).ok()?;
     }
 
-    if fetched == 0 {
-        return Ok(None);
-    }
-
-    Ok(Some(idlist))
+    Ok(pidls.get(0).and_then(|&p| NonNull::new(p)))
 }
 
 fn read_icon(
     view: &IFolderView,
     folder: &IShellFolder,
-    idlist: &ITEMIDLIST,
+    idlist: NonNull<ITEMIDLIST>,
 ) -> Result<DesktopIcon> {
     let mut strret = STRRET::default();
     unsafe {
-        folder.GetDisplayNameOf(idlist, SHGDN_NORMAL, &mut strret)?;
+        folder.GetDisplayNameOf(idlist.as_ptr(), SHGDN_NORMAL, &mut strret)?;
     }
 
     let mut name = PWSTR::null();
-    unsafe { windows::Win32::UI::Shell::StrRetToStrW(&mut strret, Some(idlist), &mut name)? };
+    unsafe {
+        windows::Win32::UI::Shell::StrRetToStrW(&mut strret, Some(idlist.as_ptr()), &mut name)?
+    };
     let name_string = unsafe { name.to_string()? };
 
     unsafe {
         CoTaskMemFree(Some(name.0 as _));
     }
 
-    let position = unsafe { view.GetItemPosition(idlist) }?;
+    let position = unsafe { view.GetItemPosition(idlist.as_ptr()) }?;
 
     Ok(DesktopIcon {
         x: position.x,
         y: position.y,
         name: name_string,
+        idlist,
     })
 }
