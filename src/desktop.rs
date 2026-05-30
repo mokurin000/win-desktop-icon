@@ -57,7 +57,7 @@ impl DesktopView {
         let mut icons = Vec::new();
 
         while let Some(idlist) = next_item(&enumerator)? {
-            icons.push(unsafe { DesktopIcon::new(idlist) });
+            icons.push(unsafe { DesktopIcon::from_com(idlist) });
         }
 
         Ok(icons)
@@ -75,9 +75,9 @@ impl DesktopView {
     ///
     /// bytes must be exactly the same as `DesktopIcon::as_bytes` from the same Windows instance.
     pub unsafe fn icon_from_bytes<'a, 'b>(&'a self, bytes: &'b mut [u8]) -> DesktopIcon<'a, 'b> {
-        DesktopIcon::new(
+        DesktopIcon::from_rust(
             // SAFETY: & is never null pointer
-            NonNull::new_unchecked(bytes as *mut [u8] as _),
+            NonNull::new_unchecked(bytes as *mut [u8] as *mut u8 as _),
         )
     }
 
