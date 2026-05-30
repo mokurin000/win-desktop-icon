@@ -1,4 +1,5 @@
 use crossfire::AsyncTx;
+use crossfire::oneshot::RxOneshot;
 use crossfire::spsc::Array;
 use desktop_icon::desktop::DesktopView;
 use desktop_icon::utils::{backup_icons, restore_icons};
@@ -49,6 +50,7 @@ impl Component for MainModel {
         }
 
         let (cmd_tx, cmd_rx) = crossfire::spsc::bounded_async::<DesktopCommand>(1024);
+        let (restored_tx, restored_rx) = crossfire::oneshot::oneshot::<()>();
 
         compio::runtime::spawn_blocking(move || {
             let Ok(view) = DesktopView::connect() else {
@@ -60,7 +62,11 @@ impl Component for MainModel {
             while let Ok(cmd) = rx.recv() {
                 if let Err(e) = match cmd {
                     DesktopCommand::Backup => backup_icons(&view).map_err(Error::from),
-                    DesktopCommand::Restore => restore_icons(&view).map_err(Error::from),
+                    DesktopCommand::Restore => {
+                        _ = restore_icons(&view);
+                        restored_tx.send(());
+                        break;
+                    }
                     DesktopCommand::Arrange(rect) => {
                         arrange_icons(&view, rect).map_err(Error::from)
                     }
@@ -82,6 +88,7 @@ impl Component for MainModel {
             progress,
             text,
             cmd_tx,
+            restored_rx: Some(restored_rx),
             clicked: false,
             completed: false,
         })
@@ -176,7 +183,15 @@ impl Component for MainModel {
                 {
                     MessageBoxResponse::Yes => {
                         self.cmd_tx.send(DesktopCommand::Restore).await?;
-                        sender.output(());
+                        let sender = sender.clone();
+
+                        if let Some(rx) = self.restored_rx.take() {
+                            compio::runtime::spawn(async move {
+                                _ = rx.await;
+                                sender.output(());
+                            })
+                            .detach();
+                        }
                     }
                     _ => {}
                 }
@@ -231,7 +246,6 @@ impl MainModel {
     }
 }
 
-#[derive(Debug)]
 pub struct MainModel {
     window: Child<Window>,
     button: Child<Button>,
@@ -239,12 +253,13 @@ pub struct MainModel {
     text: Child<Label>,
 
     cmd_tx: AsyncTx<Array<DesktopCommand>>,
+    restored_rx: Option<RxOneshot<()>>,
 
     clicked: bool,
     completed: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DesktopCommand {
     Backup,
     Restore,
