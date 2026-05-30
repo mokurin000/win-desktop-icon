@@ -45,9 +45,11 @@ impl DesktopIcon<'_, '_> {
         }
     }
 
+    /// Get variable-length ITEMIDLIST
+    ///
+    /// See [libfwsi](https://github.com/libyal/libfwsi/blob/2f2aba25b888f37314a39d8c3e71c0e3ced56e59/documentation/Windows%20Shell%20Item%20format.asciidoc#2-shell-item-list)
     pub fn as_bytes(&self) -> &[u8] {
         unsafe {
-            // ITEMIDLIST is actually null-terminated list of variable-length PIDL's.
             let list_size = ILGetSize(Some(self.inner.as_ptr()));
             std::slice::from_raw_parts_mut(self.inner.as_ptr().cast(), list_size as _)
         }
