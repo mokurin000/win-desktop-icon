@@ -1,6 +1,8 @@
 [package]
 name = "desktop-tidy-master"
-version = "0.1.0"
+version = "1.0.0"
+description = "Desktop icon organizer"
+authors = ["mokurin000"]
 edition = "2024"
 
 [dependencies]
@@ -26,4 +28,4 @@ path = "src/main.rs"
 name = "DesktopTidyMaster"
 
 [build-dependencies]
-embed-resource = "3.0.9"
+winresource = "0.1.31"
