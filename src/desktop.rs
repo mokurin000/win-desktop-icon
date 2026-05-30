@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use crate::com::ComApartment;
@@ -13,11 +14,12 @@ use windows::Win32::UI::Shell::{
     SWFO_NEEDDISPATCH,
 };
 
-pub struct DesktopIcon {
+pub struct DesktopIcon<'a> {
     inner: NonNull<ITEMIDLIST>,
+    _mark: PhantomData<&'a ()>,
 }
 
-impl Drop for DesktopIcon {
+impl Drop for DesktopIcon<'_> {
     fn drop(&mut self) {
         unsafe {
             CoTaskMemFree(Some(self.inner.as_ptr() as _));
@@ -33,9 +35,12 @@ pub struct DesktopIconInfo {
 }
 
 pub struct DesktopView {
-    _com: ComApartment,
     folder_view: IFolderView,
     shell_folder: IShellFolder,
+
+    // must drop after IShellFolder & IFolderView
+    // do not move this field.
+    _com: ComApartment,
 }
 
 impl DesktopView {
@@ -54,13 +59,16 @@ impl DesktopView {
         })
     }
 
-    pub fn icons(&self) -> Result<Vec<DesktopIcon>> {
+    pub fn icons(&self) -> Result<Vec<DesktopIcon<'_>>> {
         let enumerator = unsafe { self.folder_view.Items(SVGIO_ALLVIEW)? };
 
         let mut icons = Vec::new();
 
         while let Some(idlist) = next_item(&enumerator)? {
-            icons.push(DesktopIcon { inner: idlist });
+            icons.push(DesktopIcon {
+                inner: idlist,
+                _mark: Default::default(),
+            });
         }
 
         Ok(icons)
