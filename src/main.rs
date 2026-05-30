@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use spdlog::error;
 
 use win_desktop_icon::desktop::DesktopView;
 use win_desktop_icon::utils::{backup_icons, restore_icons};
@@ -19,7 +20,9 @@ fn main() -> Result<(), eyre::Report> {
     if args.restore {
         restore_icons(&view)?;
     } else {
-        backup_icons(&view)?;
+        backup_icons(&view).inspect_err(|e| {
+            error!("Backup failed: {e}");
+        })?;
     }
 
     Ok(())

@@ -2,6 +2,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 
+use spdlog::{error, info};
 use windows::Win32::Foundation::POINT;
 
 use crate::desktop::DesktopView;
@@ -56,14 +57,23 @@ pub fn restore_icons(view: &DesktopView) -> Result<(), eyre::Report> {
     let data = std::fs::read(desktop_backup_path())?;
     let states: Vec<DeskopIconState> = bitcode::decode(&data)?;
 
-    for mut state in states {
-        let point = state.point();
-        let icon = unsafe { view.icon_from_bytes(&mut state.pidl) };
-        if let Err(e) = view.icon_set_position(&icon, &point) {
-            println!("Error: {e}");
-        }
-        println!("point: {point:?} recovered");
-    }
+    let total = states.len();
+    let succ = states
+        .into_iter()
+        .map(|mut state| {
+            let point = state.point();
+            let icon = unsafe { view.icon_from_bytes(&mut state.pidl) };
+            view.icon_set_position(&icon, &point).inspect_err(|e| {
+                error!("Error: {e}");
+            })?;
+
+            // Try read icon info to check failure due to icon renamed
+            view.icon_info(&icon)
+        })
+        .filter(Result::is_ok)
+        .count();
+
+    info!("Recovered {succ}/{total} icons");
 
     Ok(())
 }
