@@ -5,13 +5,14 @@ use crate::com::ComApartment;
 use crate::error::{AppError, Result};
 
 use windows::core::{Interface, PWSTR};
+use windows::Win32::Foundation::POINT;
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, IServiceProvider, CLSCTX_ALL};
 use windows::Win32::System::Variant::{VariantInit, VARIANT};
 use windows::Win32::UI::Shell::Common::{ITEMIDLIST, STRRET};
 use windows::Win32::UI::Shell::{
     IEnumIDList, IFolderView, IShellBrowser, IShellFolder, IShellView, IShellWindows,
-    SID_STopLevelBrowser, ShellWindows, SHGDN_NORMAL, SVGIO_ALLVIEW, SWC_DESKTOP,
-    SWFO_NEEDDISPATCH,
+    SID_STopLevelBrowser, ShellWindows, SHGDN_NORMAL, SVGIO_ALLVIEW, SVSI_POSITIONITEM,
+    SWC_DESKTOP, SWFO_NEEDDISPATCH,
 };
 
 pub struct DesktopIcon<'a> {
@@ -84,6 +85,19 @@ impl DesktopView {
             y: position.y,
             name,
         })
+    }
+
+    pub fn icon_set_position(&self, icon: &DesktopIcon, point: &POINT) -> Result<()> {
+        unsafe {
+            self.folder_view.SelectAndPositionItems(
+                1,
+                &(icon.inner.as_ptr() as *const ITEMIDLIST) as *const *const ITEMIDLIST,
+                Some(point),
+                SVSI_POSITIONITEM.0 as _,
+            )
+        }?;
+
+        Ok(())
     }
 
     fn read_name(&self, idlist: &DesktopIcon) -> Result<String> {

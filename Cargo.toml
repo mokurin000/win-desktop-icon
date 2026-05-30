@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+eyre = "0.6.12"
 thiserror = "2"
 
 [target.'cfg(windows)'.dependencies]
@@ -16,3 +17,9 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_Shell",
     "Win32_UI_Shell_Common",
 ] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "unwind"
