@@ -610,6 +610,7 @@ dependencies = [
  "compio",
  "crossfire",
  "desktop-icon",
+ "embed-resource",
  "fastrand",
  "spdlog-rs",
  "thiserror 2.0.18",

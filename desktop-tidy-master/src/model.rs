@@ -52,6 +52,8 @@ impl Component for MainModel {
         let (cmd_tx, cmd_rx) = crossfire::spsc::bounded_async::<DesktopCommand>(1024);
         let (restored_tx, restored_rx) = crossfire::oneshot::oneshot::<()>();
 
+        window.set_icon_by_id(666)?;
+
         compio::runtime::spawn_blocking(move || {
             let Ok(view) = DesktopView::connect() else {
                 error!("Failed to initialize DesktopView!");
