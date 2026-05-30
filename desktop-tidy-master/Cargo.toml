@@ -1,0 +1,16 @@
+[package]
+name = "desktop-tidy-master"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = { workspace = true }
+
+winio = { version = "0.11.0", features = [
+    "win32-dark-mode",
+    "win32",
+], default-features = false }
+
+[[bin]]
+path = "src/main.rs"
+name = "DesktopTidyMaster"

@@ -1,5 +1,5 @@
 [workspace]
-members = ["backup-desktop", "desktop-icon"]
+members = ["backup-desktop", "desktop-icon", "desktop-tidy-master"]
 default-members = ["backup-desktop"]
 resolver = "3"
 
