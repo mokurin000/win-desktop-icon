@@ -9,6 +9,7 @@ pub struct MainModel {
     window: Child<Window>,
     button: Child<Button>,
     progress: Child<Progress>,
+    text: Child<Label>,
 
     desktop_view: DesktopView,
     clicked: bool,
@@ -22,9 +23,10 @@ pub enum MainMessage {
     Redraw,
     Clicked,
     SetPosition(usize),
+    Completed,
 }
 
-const PROGRESS_TIME_MS: u64 = 5000;
+const PROGRESS_TIME_MS: u64 = 3000;
 const PROGRESS_MAX: f64 = 1000.0;
 
 #[derive(Debug, thiserror::Error)]
@@ -66,14 +68,21 @@ impl Component for MainModel {
                 },
             },
             button: Button = (&window) => {
-                text: "Click me",
+                text: "Organize",
+                tooltip: "Organize your desktop icons in one-click!",
             },
             progress: Progress = (&window) => {
                 pos: 0,
                 minimum: 0,
                 maximum: PROGRESS_MAX.round() as _,
-            }
+            },
+            text: Label = (&window) => {
+                halign: HAlign::Center,
+                text: "DONE",
+            },
         }
+
+        text.hide()?;
 
         window.set_backdrop(Backdrop::Mica)?;
         window.show()?;
@@ -82,6 +91,7 @@ impl Component for MainModel {
             window,
             button,
             progress,
+            text,
             desktop_view: DesktopView::connect()?,
             clicked: false,
             completed: false,
@@ -90,29 +100,47 @@ impl Component for MainModel {
 
     fn render(&mut self, _sender: &ComponentSender<Self>) -> std::result::Result<(), Self::Error> {
         let csize = self.window.client_size()?;
-        {
-            let mut inner = layout! {
-                StackPanel::new(Orient::Vertical),
-                self.button => {
-                    height: 50.0,
-                    width: 160.0,
-                },
-                self.progress => {
-                    height: 20.0,
-                    width: 160.0,
-                }
-            };
-            let mut panel = layout! {
-                Grid::new(
-                    vec![GridLength::Stretch(1.0)],
-                    vec![GridLength::Stretch(1.0)],
-                ),
-                inner => {
-                    halign: HAlign::Center,
-                    valign: VAlign::Center,
-                },
-            };
-            panel.set_size(csize)?;
+        match self.completed {
+            true => {
+                let mut panel = layout! {
+                    Grid::new(
+                        vec![GridLength::Stretch(1.0)],
+                        vec![GridLength::Stretch(1.0)],
+                    ),
+                    self.text => {
+                        height: 70.0,
+                        width: 160.0,
+                        halign: HAlign::Center,
+                        valign: VAlign::Center,
+                    },
+                };
+                panel.set_size(csize)?;
+            }
+            false => {
+                let mut inner = layout! {
+                    StackPanel::new(Orient::Vertical),
+                    self.button => {
+                        height: 50.0,
+                        width: 160.0,
+                    },
+                    self.progress => {
+                        height: 20.0,
+                        width: 160.0,
+                    }
+                };
+
+                let mut panel = layout! {
+                    Grid::new(
+                        vec![GridLength::Stretch(1.0)],
+                        vec![GridLength::Stretch(1.0)],
+                    ),
+                    inner => {
+                        halign: HAlign::Center,
+                        valign: VAlign::Center,
+                    },
+                };
+                panel.set_size(csize)?;
+            }
         }
         Ok(())
     }
@@ -149,7 +177,7 @@ impl Component for MainModel {
             MainMessage::Close => {
                 match MessageBox::new()
                     .title("Exit")
-                    .message("Quit this program?")
+                    .message("Quit and recover your desktop?")
                     .style(MessageBoxStyle::Info)
                     .buttons(MessageBoxButton::Yes | MessageBoxButton::No)
                     .show(&self.window)
@@ -179,6 +207,15 @@ impl Component for MainModel {
                 self.progress.set_pos(pos)?;
                 Ok(true)
             }
+            MainMessage::Completed => {
+                // TODO: move icons on WindowEvent::Move
+                self.completed = true;
+                self.text.show()?;
+                self.button.hide()?;
+                self.progress.hide()?;
+
+                Ok(true)
+            }
         }
     }
 }
@@ -205,7 +242,8 @@ fn spawn_timer(sender: ComponentSender<MainModel>) {
             let pos = sigmoid(start.elapsed().as_millis() as f64 / PROGRESS_TIME_MS as f64);
             sender.post(MainMessage::SetPosition(pos));
         }
-        sender.post(MainMessage::SetPosition(PROGRESS_MAX as _));
+
+        sender.post(MainMessage::Completed);
     })
     .detach();
 }
