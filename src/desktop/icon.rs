@@ -1,6 +1,9 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
-use windows::Win32::{System::Com::CoTaskMemFree, UI::Shell::Common::ITEMIDLIST};
+use windows::Win32::{
+    System::Com::CoTaskMemFree,
+    UI::Shell::{Common::ITEMIDLIST, ILGetSize},
+};
 
 pub struct DesktopIcon<'desktop, 'itemid> {
     pub(crate) inner: NonNull<ITEMIDLIST>,
@@ -44,9 +47,9 @@ impl DesktopIcon<'_, '_> {
 
     pub fn as_bytes(&self) -> &[u8] {
         unsafe {
-            let cb: u16 = self.inner.cast().read();
-            let start = self.inner.as_ptr() as *mut u8;
-            std::slice::from_raw_parts_mut(start, cb as usize)
+            // ITEMIDLIST is actually null-terminated list of variable-length PIDL's.
+            let list_size = ILGetSize(Some(self.inner.as_ptr()));
+            std::slice::from_raw_parts_mut(self.inner.as_ptr().cast(), list_size as _)
         }
     }
 }
