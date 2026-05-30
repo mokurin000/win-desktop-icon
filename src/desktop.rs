@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use crate::com::ComApartment;
@@ -15,23 +14,12 @@ use windows::Win32::UI::Shell::{
     SWC_DESKTOP, SWFO_NEEDDISPATCH,
 };
 
-pub struct DesktopIcon<'a> {
-    inner: NonNull<ITEMIDLIST>,
-    _mark: PhantomData<&'a ()>,
-}
-
-impl Drop for DesktopIcon<'_> {
-    fn drop(&mut self) {
-        unsafe {
-            CoTaskMemFree(Some(self.inner.as_ptr() as _));
-        }
-    }
-}
+mod icon;
+use icon::DesktopIcon;
 
 #[derive(Debug)]
 pub struct DesktopIconInfo {
-    pub x: i32,
-    pub y: i32,
+    pub position: POINT,
     pub name: String,
 }
 
@@ -66,10 +54,7 @@ impl DesktopView {
         let mut icons = Vec::new();
 
         while let Some(idlist) = next_item(&enumerator)? {
-            icons.push(DesktopIcon {
-                inner: idlist,
-                _mark: Default::default(),
-            });
+            icons.push(unsafe { DesktopIcon::new(idlist) });
         }
 
         Ok(icons)
@@ -80,11 +65,7 @@ impl DesktopView {
 
         let name = self.read_name(icon)?;
 
-        Ok(DesktopIconInfo {
-            x: position.x,
-            y: position.y,
-            name,
-        })
+        Ok(DesktopIconInfo { position, name })
     }
 
     pub fn icon_set_position(&self, icon: &DesktopIcon, point: &POINT) -> Result<()> {
