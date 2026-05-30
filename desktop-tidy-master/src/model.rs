@@ -144,7 +144,8 @@ impl Component for MainModel {
             self.window => {
                 WindowEvent::Move => MainMessage::MoveIcon,
                 WindowEvent::Close => MainMessage::Close,
-                WindowEvent::Resize | WindowEvent::ThemeChanged => MainMessage::Redraw,
+                WindowEvent::Resize => MainMessage::Resized,
+                WindowEvent::ThemeChanged => MainMessage::Redraw,
             },
             self.button => {
                 ButtonEvent::Click => MainMessage::Clicked,
@@ -182,6 +183,10 @@ impl Component for MainModel {
                 Ok(false)
             }
             MainMessage::Redraw => Ok(true),
+            MainMessage::Resized => {
+                self.rearrange().await?;
+                Ok(true)
+            }
             MainMessage::Clicked => {
                 self.clicked = true;
                 self.button.disable()?;
@@ -202,22 +207,27 @@ impl Component for MainModel {
                 self.text.show()?;
                 self.button.hide()?;
                 self.progress.hide()?;
-
-                self.cmd_tx
-                    .send(DesktopCommand::Arrange(self.window.rect()?))
-                    .await?;
+                self.rearrange().await?;
 
                 Ok(true)
             }
             MainMessage::MoveIcon => {
-                if self.completed {
-                    self.cmd_tx
-                        .send(DesktopCommand::Arrange(self.window.rect()?))
-                        .await?;
-                }
+                self.rearrange().await?;
                 Ok(false)
             }
         }
+    }
+}
+
+impl MainModel {
+    /// Rearrange icons if progress completed
+    async fn rearrange(&self) -> std::result::Result<(), Error> {
+        if self.completed {
+            self.cmd_tx
+                .send(DesktopCommand::Arrange(self.window.rect()?))
+                .await?;
+        }
+        Ok(())
     }
 }
 
@@ -246,6 +256,7 @@ pub enum MainMessage {
     Noop,
     Close,
     Redraw,
+    Resized,
     Clicked,
     Completed,
     MoveIcon,
