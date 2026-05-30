@@ -6,6 +6,7 @@ use spdlog::{error, info};
 use windows::Win32::Foundation::POINT;
 
 use crate::desktop::DesktopView;
+use crate::error::AppError;
 use crate::persist::DeskopIconState;
 
 fn desktop_backup_path() -> PathBuf {
@@ -18,7 +19,7 @@ fn desktop_backup_path() -> PathBuf {
     path.join("desktop_icons.bin")
 }
 
-pub fn backup_icons(view: &DesktopView) -> Result<(), eyre::Report> {
+pub fn backup_icons(view: &DesktopView) -> Result<(), AppError> {
     let icons = view.icons()?;
 
     let mut states = Vec::with_capacity(icons.len());
@@ -53,7 +54,7 @@ pub fn backup_icons(view: &DesktopView) -> Result<(), eyre::Report> {
     Ok(())
 }
 
-pub fn restore_icons(view: &DesktopView) -> Result<(), eyre::Report> {
+pub fn restore_icons(view: &DesktopView) -> Result<(), AppError> {
     let data = std::fs::read(desktop_backup_path())?;
     let states: Vec<DeskopIconState> = bitcode::decode(&data)?;
 

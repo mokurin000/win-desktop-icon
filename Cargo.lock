@@ -595,6 +595,7 @@ name = "desktop-tidy-master"
 version = "0.1.0"
 dependencies = [
  "compio",
+ "desktop-icon",
  "thiserror 2.0.18",
  "winio",
 ]

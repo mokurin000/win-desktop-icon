@@ -13,6 +13,10 @@ pub enum AppError {
     DesktopViewUnavailable,
     #[error("shell window did not expose a dispatch object")]
     MissingDispatch,
-    #[error("utf16 error")]
+    #[error("utf16 error: {0}")]
     UTF16Error(#[from] FromUtf16Error),
+    #[error("IO Error: {0}")]
+    IOError(#[from] std::io::Error),
+    #[error("Bitcode Error: {0}")]
+    BitError(#[from] bitcode::Error),
 }

@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use compio::time::interval;
+use desktop_icon::desktop::DesktopView;
 use winio::prelude::*;
 
 #[derive(Debug)]
@@ -8,7 +9,10 @@ pub struct MainModel {
     window: Child<Window>,
     button: Child<Button>,
     progress: Child<Progress>,
+
+    desktop_view: DesktopView,
     clicked: bool,
+    completed: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -31,6 +35,10 @@ pub enum Error {
     /// An layouting error
     #[error("Layout error: {0}")]
     Layout(#[from] winio::layout::LayoutError<winio::Error>),
+
+    /// desktop icon error
+    #[error("Backend error: {0}")]
+    Backend(#[from] desktop_icon::error::AppError),
 }
 
 impl Component for MainModel {
@@ -74,7 +82,9 @@ impl Component for MainModel {
             window,
             button,
             progress,
+            desktop_view: DesktopView::connect()?,
             clicked: false,
+            completed: false,
         })
     }
 
@@ -146,6 +156,7 @@ impl Component for MainModel {
                     .await?
                 {
                     MessageBoxResponse::Yes => {
+                        desktop_icon::utils::restore_icons(&self.desktop_view)?;
                         sender.output(());
                     }
                     _ => {}
@@ -156,6 +167,8 @@ impl Component for MainModel {
             MainMessage::Clicked => {
                 self.clicked = true;
                 self.button.disable()?;
+
+                desktop_icon::utils::backup_icons(&self.desktop_view)?;
 
                 let sender = sender.clone();
                 spawn_timer(sender);

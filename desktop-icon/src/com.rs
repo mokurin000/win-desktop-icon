@@ -1,6 +1,7 @@
 use crate::error::Result;
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
 
+#[derive(Debug)]
 pub struct ComApartment;
 
 impl ComApartment {

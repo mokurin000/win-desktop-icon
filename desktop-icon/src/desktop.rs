@@ -23,6 +23,7 @@ pub struct DesktopIconInfo {
     pub name: String,
 }
 
+#[derive(Debug)]
 pub struct DesktopView {
     folder_view: IFolderView,
     shell_folder: IShellFolder,
