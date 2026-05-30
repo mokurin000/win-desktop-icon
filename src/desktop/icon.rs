@@ -1,9 +1,9 @@
-use std::{marker::PhantomData, ptr::NonNull};
+use std::marker::PhantomData;
+use std::ptr::NonNull;
 
-use windows::Win32::{
-    System::Com::CoTaskMemFree,
-    UI::Shell::{Common::ITEMIDLIST, ILGetSize},
-};
+use windows::Win32::System::Com::CoTaskMemFree;
+use windows::Win32::UI::Shell::Common::ITEMIDLIST;
+use windows::Win32::UI::Shell::ILGetSize;
 
 pub struct DesktopIcon<'desktop, 'itemid> {
     pub(crate) inner: NonNull<ITEMIDLIST>,
