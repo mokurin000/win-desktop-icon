@@ -1,8 +1,15 @@
 use std::time::{Duration, Instant};
 
 use compio::time::interval;
+use crossfire::AsyncTx;
+use crossfire::spsc::Array;
 use desktop_icon::desktop::DesktopView;
+use desktop_icon::utils::{backup_icons, restore_icons};
+use spdlog::error;
 use winio::prelude::*;
+
+mod utils;
+use utils::arrange_icons;
 
 #[derive(Debug)]
 pub struct MainModel {
@@ -11,9 +18,17 @@ pub struct MainModel {
     progress: Child<Progress>,
     text: Child<Label>,
 
-    desktop_view: DesktopView,
+    cmd_tx: AsyncTx<Array<DesktopCommand>>,
+
     clicked: bool,
     completed: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DesktopCommand {
+    Backup,
+    Restore,
+    Arrange(Rect),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -42,6 +57,10 @@ pub enum Error {
     /// desktop icon error
     #[error("Backend error: {0}")]
     Backend(#[from] desktop_icon::error::AppError),
+
+    /// Channel error
+    #[error("Channel error: {0}")]
+    Channel(#[from] crossfire::SendError<DesktopCommand>),
 }
 
 impl Component for MainModel {
@@ -83,6 +102,29 @@ impl Component for MainModel {
             },
         }
 
+        let (cmd_tx, cmd_rx) = crossfire::spsc::bounded_async::<DesktopCommand>(1024);
+
+        compio::runtime::spawn_blocking(move || {
+            let Ok(view) = DesktopView::connect() else {
+                error!("Failed to initialize DesktopView!");
+                return;
+            };
+
+            let rx = cmd_rx.into_blocking();
+            while let Ok(cmd) = rx.recv() {
+                if let Err(e) = match cmd {
+                    DesktopCommand::Backup => backup_icons(&view).map_err(Error::from),
+                    DesktopCommand::Restore => restore_icons(&view).map_err(Error::from),
+                    DesktopCommand::Arrange(rect) => {
+                        arrange_icons(&view, rect).map_err(Error::from)
+                    }
+                } {
+                    error!("Action failed: {e}");
+                }
+            }
+        })
+        .detach();
+
         text.hide()?;
 
         window.set_backdrop(Backdrop::Mica)?;
@@ -93,7 +135,7 @@ impl Component for MainModel {
             button,
             progress,
             text,
-            desktop_view: DesktopView::connect()?,
+            cmd_tx,
             clicked: false,
             completed: false,
         })
@@ -186,7 +228,7 @@ impl Component for MainModel {
                     .await?
                 {
                     MessageBoxResponse::Yes => {
-                        desktop_icon::utils::restore_icons(&self.desktop_view)?;
+                        self.cmd_tx.send(DesktopCommand::Restore).await?;
                         sender.output(());
                     }
                     _ => {}
@@ -198,7 +240,7 @@ impl Component for MainModel {
                 self.clicked = true;
                 self.button.disable()?;
 
-                desktop_icon::utils::backup_icons(&self.desktop_view)?;
+                self.cmd_tx.send(DesktopCommand::Backup).await?;
 
                 let sender = sender.clone();
                 spawn_timer(sender);
@@ -215,13 +257,17 @@ impl Component for MainModel {
                 self.button.hide()?;
                 self.progress.hide()?;
 
-                arrange_icons(&self.desktop_view, &self.window)?;
+                self.cmd_tx
+                    .send(DesktopCommand::Arrange(self.window.rect()?))
+                    .await?;
 
                 Ok(true)
             }
             MainMessage::MoveIcon => {
                 if self.completed {
-                    arrange_icons(&self.desktop_view, &self.window)?;
+                    self.cmd_tx
+                        .send(DesktopCommand::Arrange(self.window.rect()?))
+                        .await?;
                 }
                 Ok(false)
             }
@@ -255,26 +301,4 @@ fn spawn_timer(sender: ComponentSender<MainModel>) {
         sender.post(MainMessage::Completed);
     })
     .detach();
-}
-
-fn arrange_icons(desktop_view: &DesktopView, window: &Window) -> std::result::Result<(), Error> {
-    let origin = window.loc()?;
-    let size = window.size()?;
-    let rect = Rect::new(origin, size);
-
-    let left = rect.min_x() as i32;
-    let top = rect.min_y() as i32;
-    let right = rect.max_x() as i32 - 80;
-    let bottom = rect.max_y() as i32 - 80;
-
-    let icons = desktop_view.icons()?;
-
-    for icon in icons {
-        if let Some(x) = fastrand::choice(left..right)
-            && let Some(y) = fastrand::choice(top..bottom)
-        {
-            desktop_view.icon_set_position(&icon, x, y)?;
-        }
-    }
-    Ok(())
 }
