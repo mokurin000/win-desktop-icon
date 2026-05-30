@@ -1,0 +1,253 @@
+use crossfire::AsyncTx;
+use crossfire::spsc::Array;
+use desktop_icon::desktop::DesktopView;
+use desktop_icon::utils::{backup_icons, restore_icons};
+use spdlog::error;
+use winio::prelude::*;
+
+use crate::PROGRESS_MAX;
+use crate::errors::Error;
+use crate::utils::{arrange_icons, spawn_timer};
+
+impl Component for MainModel {
+    type Init<'a> = ();
+    type Event = ();
+    type Message = MainMessage;
+    type Error = Error;
+
+    async fn init(
+        _init: Self::Init<'_>,
+        _sender: &ComponentSender<Self>,
+    ) -> std::result::Result<Self, Self::Error> {
+        init! {
+            window: Window = (()) => {
+                text: "Desktop Tidy Master",
+                size: Size::new(800.0, 600.0),
+                loc: {
+                    let monitors = Monitor::all()?;
+                    if let Some(monitor) = monitors.first() {
+                        let region = monitor.client_scaled();
+                        region.origin + region.size / 2.0 - window.size()? / 2.0
+                    } else {
+                        Point::zero()
+                    }
+                },
+            },
+            button: Button = (&window) => {
+                text: "Organize",
+                tooltip: "Organize your desktop icons in one-click!",
+            },
+            progress: Progress = (&window) => {
+                pos: 0,
+                minimum: 0,
+                maximum: PROGRESS_MAX.round() as _,
+            },
+            text: Label = (&window) => {
+                halign: HAlign::Center,
+                text: "DONE",
+            },
+        }
+
+        let (cmd_tx, cmd_rx) = crossfire::spsc::bounded_async::<DesktopCommand>(1024);
+
+        compio::runtime::spawn_blocking(move || {
+            let Ok(view) = DesktopView::connect() else {
+                error!("Failed to initialize DesktopView!");
+                return;
+            };
+
+            let rx = cmd_rx.into_blocking();
+            while let Ok(cmd) = rx.recv() {
+                if let Err(e) = match cmd {
+                    DesktopCommand::Backup => backup_icons(&view).map_err(Error::from),
+                    DesktopCommand::Restore => restore_icons(&view).map_err(Error::from),
+                    DesktopCommand::Arrange(rect) => {
+                        arrange_icons(&view, rect).map_err(Error::from)
+                    }
+                } {
+                    error!("Action failed: {e}");
+                }
+            }
+        })
+        .detach();
+
+        text.hide()?;
+
+        window.set_backdrop(Backdrop::Mica)?;
+        window.show()?;
+
+        Ok(Self {
+            window,
+            button,
+            progress,
+            text,
+            cmd_tx,
+            clicked: false,
+            completed: false,
+        })
+    }
+
+    fn render(&mut self, _sender: &ComponentSender<Self>) -> std::result::Result<(), Self::Error> {
+        let csize = self.window.client_size()?;
+        match self.completed {
+            true => {
+                let mut panel = layout! {
+                    Grid::new(
+                        vec![GridLength::Stretch(1.0)],
+                        vec![GridLength::Stretch(1.0)],
+                    ),
+                    self.text => {
+                        height: 70.0,
+                        width: 160.0,
+                        halign: HAlign::Center,
+                        valign: VAlign::Center,
+                    },
+                };
+                panel.set_size(csize)?;
+            }
+            false => {
+                let mut inner = layout! {
+                    StackPanel::new(Orient::Vertical),
+                    self.button => {
+                        height: 50.0,
+                        width: 160.0,
+                    },
+                    self.progress => {
+                        height: 20.0,
+                        width: 160.0,
+                    }
+                };
+
+                let mut panel = layout! {
+                    Grid::new(
+                        vec![GridLength::Stretch(1.0)],
+                        vec![GridLength::Stretch(1.0)],
+                    ),
+                    inner => {
+                        halign: HAlign::Center,
+                        valign: VAlign::Center,
+                    },
+                };
+                panel.set_size(csize)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn render_children(&mut self) -> std::result::Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn start(&mut self, sender: &ComponentSender<Self>) -> ! {
+        start! {
+            sender, default: MainMessage::Noop,
+            self.window => {
+                WindowEvent::Move => MainMessage::MoveIcon,
+                WindowEvent::Close => MainMessage::Close,
+                WindowEvent::Resize | WindowEvent::ThemeChanged => MainMessage::Redraw,
+            },
+            self.button => {
+                ButtonEvent::Click => MainMessage::Clicked,
+            },
+            self.progress => {}
+        }
+    }
+
+    async fn update_children(&mut self) -> std::result::Result<bool, Self::Error> {
+        update_children!(self.window, self.button, self.progress)
+    }
+
+    async fn update(
+        &mut self,
+        message: Self::Message,
+        sender: &ComponentSender<Self>,
+    ) -> std::result::Result<bool, Self::Error> {
+        match message {
+            MainMessage::Noop => Ok(false),
+            MainMessage::Close => {
+                match MessageBox::new()
+                    .title("Exit")
+                    .message("Quit and recover your desktop?")
+                    .style(MessageBoxStyle::Info)
+                    .buttons(MessageBoxButton::Yes | MessageBoxButton::No)
+                    .show(&self.window)
+                    .await?
+                {
+                    MessageBoxResponse::Yes => {
+                        self.cmd_tx.send(DesktopCommand::Restore).await?;
+                        sender.output(());
+                    }
+                    _ => {}
+                }
+                Ok(false)
+            }
+            MainMessage::Redraw => Ok(true),
+            MainMessage::Clicked => {
+                self.clicked = true;
+                self.button.disable()?;
+
+                self.cmd_tx.send(DesktopCommand::Backup).await?;
+
+                let sender = sender.clone();
+                spawn_timer(sender);
+
+                Ok(true)
+            }
+            MainMessage::SetPosition(pos) => {
+                self.progress.set_pos(pos)?;
+                Ok(true)
+            }
+            MainMessage::Completed => {
+                self.completed = true;
+                self.text.show()?;
+                self.button.hide()?;
+                self.progress.hide()?;
+
+                self.cmd_tx
+                    .send(DesktopCommand::Arrange(self.window.rect()?))
+                    .await?;
+
+                Ok(true)
+            }
+            MainMessage::MoveIcon => {
+                if self.completed {
+                    self.cmd_tx
+                        .send(DesktopCommand::Arrange(self.window.rect()?))
+                        .await?;
+                }
+                Ok(false)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct MainModel {
+    window: Child<Window>,
+    button: Child<Button>,
+    progress: Child<Progress>,
+    text: Child<Label>,
+
+    cmd_tx: AsyncTx<Array<DesktopCommand>>,
+
+    clicked: bool,
+    completed: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DesktopCommand {
+    Backup,
+    Restore,
+    Arrange(Rect),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MainMessage {
+    Noop,
+    Close,
+    Redraw,
+    Clicked,
+    Completed,
+    MoveIcon,
+    SetPosition(usize),
+}
