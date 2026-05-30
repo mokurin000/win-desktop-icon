@@ -84,7 +84,11 @@ impl DesktopView {
         }
     }
 
-    pub fn icon_set_position(&self, icon: &DesktopIcon, point: &POINT) -> Result<()> {
+    pub fn icon_set_position(&self, icon: &DesktopIcon, x: i32, y: i32) -> Result<()> {
+        Self::icon_set_point(&self, icon, &POINT { x, y })
+    }
+
+    pub fn icon_set_point(&self, icon: &DesktopIcon, point: &POINT) -> Result<()> {
         unsafe {
             self.folder_view.SelectAndPositionItems(
                 1,

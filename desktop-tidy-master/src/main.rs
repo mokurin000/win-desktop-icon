@@ -22,8 +22,9 @@ pub enum MainMessage {
     Close,
     Redraw,
     Clicked,
-    SetPosition(usize),
     Completed,
+    MoveIcon,
+    SetPosition(usize),
 }
 
 const PROGRESS_TIME_MS: u64 = 3000;
@@ -153,6 +154,7 @@ impl Component for MainModel {
         start! {
             sender, default: MainMessage::Noop,
             self.window => {
+                WindowEvent::Move => MainMessage::MoveIcon,
                 WindowEvent::Close => MainMessage::Close,
                 WindowEvent::Resize | WindowEvent::ThemeChanged => MainMessage::Redraw,
             },
@@ -208,13 +210,26 @@ impl Component for MainModel {
                 Ok(true)
             }
             MainMessage::Completed => {
-                // TODO: move icons on WindowEvent::Move
                 self.completed = true;
                 self.text.show()?;
                 self.button.hide()?;
                 self.progress.hide()?;
 
+                let origin = self.window.loc()?;
+                let size = self.window.size()?;
+                let rect = Rect::new(origin, size);
+                arrange_icons(&self.desktop_view, rect)?;
+
                 Ok(true)
+            }
+            MainMessage::MoveIcon => {
+                if self.completed {
+                    let origin = self.window.loc()?;
+                    let size = self.window.size()?;
+                    let rect = Rect::new(origin, size);
+                    arrange_icons(&self.desktop_view, rect)?;
+                }
+                Ok(false)
             }
         }
     }
@@ -246,4 +261,22 @@ fn spawn_timer(sender: ComponentSender<MainModel>) {
         sender.post(MainMessage::Completed);
     })
     .detach();
+}
+
+fn arrange_icons(desktop_view: &DesktopView, rect: Rect) -> std::result::Result<(), Error> {
+    let icons = desktop_view.icons()?;
+
+    let left = rect.min_x() as i32;
+    let top = rect.min_y() as i32;
+    let right = rect.max_x() as i32 - 80;
+    let bottom = rect.max_y() as i32 - 80;
+
+    for icon in icons {
+        if let Some(x) = fastrand::choice(left..right)
+            && let Some(y) = fastrand::choice(top..bottom)
+        {
+            desktop_view.icon_set_position(&icon, x, y)?;
+        }
+    }
+    Ok(())
 }

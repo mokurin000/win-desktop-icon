@@ -64,7 +64,7 @@ pub fn restore_icons(view: &DesktopView) -> Result<(), AppError> {
         .map(|mut state| {
             let point = state.point();
             let icon = unsafe { view.icon_from_bytes(&mut state.pidl) };
-            view.icon_set_position(&icon, &point).inspect_err(|e| {
+            view.icon_set_point(&icon, &point).inspect_err(|e| {
                 error!("Error: {e}");
             })?;
 

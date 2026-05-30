@@ -17,6 +17,7 @@ winio = { version = "0.12.0-rc.2", features = [
     "win32-dark-mode",
     "winui",
 ], default-features = false }
+fastrand = "2.4.1"
 
 [[bin]]
 path = "src/main.rs"
