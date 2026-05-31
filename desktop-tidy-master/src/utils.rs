@@ -66,6 +66,8 @@ pub fn desktop_action(
         let rx = cmd_rx.into_blocking();
         let mut arrange = None;
         loop {
+            std::thread::sleep(Duration::from_millis(20));
+
             if let Err(e) = match rx.try_recv() {
                 Ok(DesktopCommand::Backup) => backup_icons(&view).map_err(Error::from),
                 Ok(DesktopCommand::Restore) => {
