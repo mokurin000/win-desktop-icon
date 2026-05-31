@@ -46,7 +46,7 @@ impl Component for MainModel {
             },
         }
 
-        let (cmd_tx, cmd_rx) = crossfire::spsc::bounded_async::<DesktopCommand>(1024);
+        let (cmd_tx, cmd_rx) = crossfire::spsc::bounded_async::<DesktopCommand>(4096);
         let (restored_tx, restored_rx) = crossfire::oneshot::oneshot::<()>();
 
         window.set_icon_by_id(1)?;
