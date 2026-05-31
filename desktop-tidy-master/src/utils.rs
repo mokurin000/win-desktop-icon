@@ -77,7 +77,7 @@ pub fn desktop_action(
                     arrange = Some(rect);
                     continue;
                 }
-                Err(TryRecvError::Empty) if let Some(rect) = arrange => {
+                Err(TryRecvError::Empty) if let Some(rect) = arrange.take() => {
                     arrange_icons(&view, rect).map_err(Error::from)
                 }
                 Err(TryRecvError::Empty) => continue,
