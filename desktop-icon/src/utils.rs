@@ -51,6 +51,8 @@ pub fn backup_icons(view: &DesktopView) -> Result<(), AppError> {
     let encoded = bitcode::encode(&states);
     file.write_all(&encoded)?;
 
+    info!("Backed up {} icons", states.len());
+
     Ok(())
 }
 
