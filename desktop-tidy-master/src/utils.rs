@@ -80,7 +80,8 @@ pub fn desktop_action(
                 Err(TryRecvError::Empty) if let Some(rect) = arrange => {
                     arrange_icons(&view, rect).map_err(Error::from)
                 }
-                Err(_) => break,
+                Err(TryRecvError::Empty) => continue,
+                Err(TryRecvError::Disconnected) => break,
             } {
                 error!("{e}");
             }
