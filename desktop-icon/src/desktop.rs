@@ -101,6 +101,34 @@ impl DesktopView {
         Ok(())
     }
 
+    pub fn icon_set_positions<'a>(
+        &self,
+        icons: impl AsRef<[(DesktopIcon<'a, 'a>, i32, i32)]>,
+    ) -> Result<()> {
+        let apidl = icons
+            .as_ref()
+            .iter()
+            .map(|(icon, _, _)| icon.inner.as_ptr())
+            .map(|p| p as *const ITEMIDLIST)
+            .collect::<Vec<*const ITEMIDLIST>>();
+        let points = icons
+            .as_ref()
+            .iter()
+            .map(|&(_, x, y)| POINT { x, y })
+            .collect::<Vec<POINT>>();
+
+        unsafe {
+            self.folder_view.SelectAndPositionItems(
+                icons.as_ref().len() as _,
+                apidl.as_slice().as_ptr(),
+                Some(points.as_slice().as_ptr()),
+                SVSI_POSITIONITEM.0 as _,
+            )
+        }?;
+
+        Ok(())
+    }
+
     fn read_name(&self, idlist: &DesktopIcon) -> Result<String> {
         let idlist = idlist.inner.as_ptr();
         let mut strret = STRRET::default();

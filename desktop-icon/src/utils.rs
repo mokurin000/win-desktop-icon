@@ -56,25 +56,23 @@ pub fn backup_icons(view: &DesktopView) -> Result<(), AppError> {
 
 pub fn restore_icons(view: &DesktopView) -> Result<(), AppError> {
     let data = std::fs::read(desktop_backup_path())?;
-    let states: Vec<DeskopIconState> = bitcode::decode(&data)?;
 
+    let mut states: Vec<DeskopIconState> = bitcode::decode(&data)?;
     let total = states.len();
-    let succ = states
-        .into_iter()
-        .map(|mut state| {
-            let point = state.point();
+
+    let icons = states
+        .iter_mut()
+        .map(|state| {
             let icon = unsafe { view.icon_from_bytes(&mut state.pidl) };
-            view.icon_set_point(&icon, &point).inspect_err(|e| {
-                error!("Error: {e}");
-            })?;
 
-            // Try read icon info to check failure due to icon renamed
-            view.icon_info(&icon)
+            (icon, state.position_x, state.position_y)
         })
-        .filter(Result::is_ok)
-        .count();
+        .collect::<Vec<_>>();
 
-    info!("Recovered {succ}/{total} icons");
+    if let Err(e) = view.icon_set_positions(&icons) {
+        error!("Recover failed: {e}");
+    }
 
+    info!("Tried to recover {total} icons");
     Ok(())
 }
