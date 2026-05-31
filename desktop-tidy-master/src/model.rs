@@ -1,14 +1,11 @@
 use crossfire::AsyncTx;
 use crossfire::oneshot::RxOneshot;
 use crossfire::spsc::Array;
-use desktop_icon::desktop::DesktopView;
-use desktop_icon::utils::{backup_icons, restore_icons};
-use spdlog::error;
 use winio::prelude::*;
 
 use crate::PROGRESS_MAX;
 use crate::errors::Error;
-use crate::utils::{arrange_icons, spawn_timer};
+use crate::utils::{desktop_action, spawn_timer};
 
 impl Component for MainModel {
     type Init<'a> = ();
@@ -54,30 +51,7 @@ impl Component for MainModel {
 
         window.set_icon_by_id(1)?;
 
-        compio::runtime::spawn_blocking(move || {
-            let Ok(view) = DesktopView::connect() else {
-                error!("Failed to initialize DesktopView!");
-                return;
-            };
-
-            let rx = cmd_rx.into_blocking();
-            while let Ok(cmd) = rx.recv() {
-                if let Err(e) = match cmd {
-                    DesktopCommand::Backup => backup_icons(&view).map_err(Error::from),
-                    DesktopCommand::Restore => {
-                        _ = restore_icons(&view);
-                        restored_tx.send(());
-                        break;
-                    }
-                    DesktopCommand::Arrange(rect) => {
-                        arrange_icons(&view, rect).map_err(Error::from)
-                    }
-                } {
-                    error!("Action failed: {e}");
-                }
-            }
-        })
-        .detach();
+        compio::runtime::spawn_blocking(desktop_action(cmd_rx, restored_tx)).detach();
 
         text.hide()?;
 
