@@ -5,14 +5,13 @@ use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::Common::ITEMIDLIST;
 use windows::Win32::UI::Shell::ILGetSize;
 
-pub struct DesktopIcon<'desktop, 'itemid> {
+pub struct DesktopIcon<'desktop> {
     pub(crate) inner: NonNull<ITEMIDLIST>,
-    _mark1: PhantomData<&'desktop ()>,
-    _mark2: PhantomData<&'itemid ()>,
+    _mark: PhantomData<&'desktop ()>,
     rust_managed: bool,
 }
 
-impl Drop for DesktopIcon<'_, '_> {
+impl Drop for DesktopIcon<'_> {
     fn drop(&mut self) {
         if !self.rust_managed {
             unsafe {
@@ -22,27 +21,23 @@ impl Drop for DesktopIcon<'_, '_> {
     }
 }
 
-impl DesktopIcon<'_, 'static> {
+impl<'desktop> DesktopIcon<'desktop> {
     /// SAFETY: `itemid` must points to a valid ITEMIDLIST allocated by COM Interface.
     pub(crate) unsafe fn from_com(itemid: NonNull<ITEMIDLIST>) -> Self {
         Self {
             inner: itemid,
-            _mark1: Default::default(),
-            _mark2: Default::default(),
+            _mark: Default::default(),
             rust_managed: false,
         }
     }
-}
 
-impl DesktopIcon<'_, '_> {
     /// SAFETY: `itemid` must points to a valid ITEMIDLIST.
-    /// 
+    ///
     /// If `itemid` points was allocated by COM Interface, this will leak it.
     pub(crate) unsafe fn from_rust(itemid: NonNull<ITEMIDLIST>) -> Self {
         Self {
             inner: itemid,
-            _mark1: Default::default(),
-            _mark2: Default::default(),
+            _mark: Default::default(),
             rust_managed: true,
         }
     }

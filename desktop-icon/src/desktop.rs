@@ -52,7 +52,7 @@ impl DesktopView {
     // Since the ITEMIDLIST was allocated from COM api,
     // 'static lifetime mark here is fine
     /// Get all desktop icons
-    pub fn icons(&self) -> Result<Vec<DesktopIcon<'_, 'static>>> {
+    pub fn icons(&self) -> Result<Vec<DesktopIcon<'_>>> {
         let enumerator = unsafe { self.folder_view.Items(SVGIO_ALLVIEW)? };
 
         let mut icons = Vec::new();
@@ -75,7 +75,7 @@ impl DesktopView {
     /// ## SAFETY
     ///
     /// bytes must be exactly the same as `DesktopIcon::as_bytes` from the same Windows instance.
-    pub unsafe fn icon_from_bytes<'a, 'b>(&'a self, bytes: &'b mut [u8]) -> DesktopIcon<'a, 'b> {
+    pub unsafe fn icon_from_bytes(&self, bytes: &mut [u8]) -> DesktopIcon<'_> {
         unsafe {
             DesktopIcon::from_rust(
                 // SAFETY: & is never null pointer
