@@ -75,7 +75,10 @@ impl DesktopView {
     /// ## SAFETY
     ///
     /// bytes must be exactly the same as `DesktopIcon::as_bytes` from the same Windows instance.
-    pub unsafe fn icon_from_bytes<'a>(&self, bytes: &'a mut [u8]) -> DesktopIcon<'a> {
+    pub unsafe fn icon_from_bytes<'icon, 'desktop: 'icon, 'mem: 'icon>(
+        &'desktop self,
+        bytes: &'mem mut [u8],
+    ) -> DesktopIcon<'icon> {
         unsafe { DesktopIcon::from_rust(bytes) }
     }
 
