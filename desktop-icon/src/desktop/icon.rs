@@ -9,12 +9,12 @@ pub struct DesktopIcon<'desktop, 'itemid> {
     pub(crate) inner: NonNull<ITEMIDLIST>,
     _mark1: PhantomData<&'desktop ()>,
     _mark2: PhantomData<&'itemid ()>,
-    no_free: bool,
+    rust_managed: bool,
 }
 
 impl Drop for DesktopIcon<'_, '_> {
     fn drop(&mut self) {
-        if !self.no_free {
+        if !self.rust_managed {
             unsafe {
                 CoTaskMemFree(Some(self.inner.as_ptr() as _));
             }
@@ -23,25 +23,27 @@ impl Drop for DesktopIcon<'_, '_> {
 }
 
 impl DesktopIcon<'_, 'static> {
-    /// SAFETY: `itemid` must points to a valid ITEMIDLIST.
+    /// SAFETY: `itemid` must points to a valid ITEMIDLIST allocated by COM Interface.
     pub(crate) unsafe fn from_com(itemid: NonNull<ITEMIDLIST>) -> Self {
         Self {
             inner: itemid,
             _mark1: Default::default(),
             _mark2: Default::default(),
-            no_free: false,
+            rust_managed: false,
         }
     }
 }
 
 impl DesktopIcon<'_, '_> {
     /// SAFETY: `itemid` must points to a valid ITEMIDLIST.
+    /// 
+    /// If `itemid` points was allocated by COM Interface, this will leak it.
     pub(crate) unsafe fn from_rust(itemid: NonNull<ITEMIDLIST>) -> Self {
         Self {
             inner: itemid,
             _mark1: Default::default(),
             _mark2: Default::default(),
-            no_free: true,
+            rust_managed: true,
         }
     }
 
