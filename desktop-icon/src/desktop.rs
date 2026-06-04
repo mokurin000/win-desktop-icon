@@ -75,13 +75,8 @@ impl DesktopView {
     /// ## SAFETY
     ///
     /// bytes must be exactly the same as `DesktopIcon::as_bytes` from the same Windows instance.
-    pub unsafe fn icon_from_bytes(&self, bytes: &mut [u8]) -> DesktopIcon<'_> {
-        unsafe {
-            DesktopIcon::from_rust(
-                // SAFETY: & is never null pointer
-                NonNull::new_unchecked(bytes as *mut [u8] as *mut u8 as _),
-            )
-        }
+    pub unsafe fn icon_from_bytes<'a>(&self, bytes: &'a mut [u8]) -> DesktopIcon<'a> {
+        unsafe { DesktopIcon::from_rust(bytes) }
     }
 
     pub fn icon_set_position(&self, icon: &DesktopIcon, x: i32, y: i32) -> Result<()> {

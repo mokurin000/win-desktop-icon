@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use windows::Win32::System::Com::CoTaskMemFree;
@@ -7,13 +6,12 @@ use windows::Win32::UI::Shell::ILGetSize;
 
 pub struct DesktopIcon<'desktop> {
     pub(crate) inner: NonNull<ITEMIDLIST>,
-    _mark: PhantomData<&'desktop ()>,
-    rust_managed: bool,
+    mut_ref: Option<&'desktop mut [u8]>,
 }
 
 impl Drop for DesktopIcon<'_> {
     fn drop(&mut self) {
-        if !self.rust_managed {
+        if !self.mut_ref.is_some() {
             unsafe {
                 CoTaskMemFree(Some(self.inner.as_ptr() as _));
             }
@@ -26,19 +24,18 @@ impl<'desktop> DesktopIcon<'desktop> {
     pub(crate) unsafe fn from_com(itemid: NonNull<ITEMIDLIST>) -> Self {
         Self {
             inner: itemid,
-            _mark: Default::default(),
-            rust_managed: false,
+            mut_ref: None,
         }
     }
 
-    /// SAFETY: `itemid` must points to a valid ITEMIDLIST.
-    ///
-    /// If `itemid` points was allocated by COM Interface, this will leak it.
-    pub(crate) unsafe fn from_rust(itemid: NonNull<ITEMIDLIST>) -> Self {
-        Self {
-            inner: itemid,
-            _mark: Default::default(),
-            rust_managed: true,
+    /// SAFETY: `bytes` must contains exactly a valid ITEMIDLIST.
+    pub(crate) unsafe fn from_rust(bytes: &'desktop mut [u8]) -> Self {
+        unsafe {
+            let pointer = NonNull::new_unchecked(bytes as *mut [u8] as *mut u8 as _);
+            Self {
+                inner: pointer,
+                mut_ref: Some(bytes),
+            }
         }
     }
 
