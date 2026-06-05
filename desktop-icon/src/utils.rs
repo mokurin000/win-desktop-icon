@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use spdlog::{error, info};
 use windows::Win32::Foundation::POINT;
 
-use crate::desktop::DesktopView;
+use crate::desktop::{DesktopIcon, DesktopView};
 use crate::error::AppError;
 use crate::persist::DeskopIconState;
 
@@ -65,7 +65,7 @@ pub fn restore_icons(view: &DesktopView) -> Result<(), AppError> {
         .into_iter()
         .map(|mut state| {
             let point = state.point();
-            let icon = unsafe { view.icon_from_bytes(&mut state.pidl) };
+            let icon = unsafe { DesktopIcon::from_rust(&mut state.pidl) };
             view.icon_set_point(&icon, &point).inspect_err(|e| {
                 error!("Error: {e}");
             })?;

@@ -4,9 +4,12 @@ use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::Common::ITEMIDLIST;
 use windows::Win32::UI::Shell::ILGetSize;
 
+use crate::desktop::DesktopView;
+
 pub struct DesktopIcon<'desktop> {
     pub(crate) inner: NonNull<ITEMIDLIST>,
     mut_ref: Option<&'desktop mut [u8]>,
+    _view: Option<&'desktop DesktopView>,
 }
 
 impl Drop for DesktopIcon<'_> {
@@ -21,24 +24,33 @@ impl Drop for DesktopIcon<'_> {
 
 impl<'desktop> DesktopIcon<'desktop> {
     /// SAFETY: `itemid` must points to a valid ITEMIDLIST allocated by COM Interface.
-    pub(crate) unsafe fn from_com(itemid: NonNull<ITEMIDLIST>) -> Self {
+    pub(crate) unsafe fn from_com(
+        view: &'desktop DesktopView,
+        itemid: NonNull<ITEMIDLIST>,
+    ) -> Self {
         Self {
             inner: itemid,
             mut_ref: None,
+            _view: Some(view),
         }
     }
+}
 
+impl<'mem> DesktopIcon<'mem> {
     /// SAFETY: `bytes` must contains exactly a valid ITEMIDLIST.
-    pub(crate) unsafe fn from_rust(bytes: &'desktop mut [u8]) -> Self {
+    pub(crate) unsafe fn from_rust(bytes: &'mem mut [u8]) -> Self {
         unsafe {
             let pointer = NonNull::new_unchecked(bytes as *mut [u8] as *mut u8 as _);
             Self {
                 inner: pointer,
                 mut_ref: Some(bytes),
+                _view: None,
             }
         }
     }
+}
 
+impl DesktopIcon<'_> {
     /// Get variable-length ITEMIDLIST
     ///
     /// See [libfwsi](https://github.com/libyal/libfwsi/blob/2f2aba25b888f37314a39d8c3e71c0e3ced56e59/documentation/Windows%20Shell%20Item%20format.asciidoc#2-shell-item-list)

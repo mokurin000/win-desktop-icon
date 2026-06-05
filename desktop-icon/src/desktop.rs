@@ -15,7 +15,7 @@ use windows::Win32::UI::Shell::{
 use windows::core::{Interface, PWSTR};
 
 mod icon;
-use icon::DesktopIcon;
+pub use icon::DesktopIcon;
 
 #[derive(Debug)]
 pub struct DesktopIconInfo {
@@ -58,7 +58,7 @@ impl DesktopView {
         let mut icons = Vec::new();
 
         while let Some(idlist) = next_item(&enumerator)? {
-            icons.push(unsafe { DesktopIcon::from_com(idlist) });
+            icons.push(unsafe { DesktopIcon::from_com(self, idlist) });
         }
 
         Ok(icons)
@@ -70,16 +70,6 @@ impl DesktopView {
         let name = self.read_name(icon)?;
 
         Ok(DesktopIconInfo { position, name })
-    }
-
-    /// ## SAFETY
-    ///
-    /// bytes must be exactly the same as `DesktopIcon::as_bytes` from the same Windows instance.
-    pub unsafe fn icon_from_bytes<'icon, 'desktop: 'icon, 'mem: 'icon>(
-        &'desktop self,
-        bytes: &'mem mut [u8],
-    ) -> DesktopIcon<'icon> {
-        unsafe { DesktopIcon::from_rust(bytes) }
     }
 
     pub fn icon_set_position(&self, icon: &DesktopIcon, x: i32, y: i32) -> Result<()> {
